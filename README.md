@@ -1,74 +1,123 @@
-[![Build status](https://github.com/git/git/workflows/CI/badge.svg)](https://github.com/git/git/actions?query=branch%3Amaster+event%3Apush)
+-- Model Name: azehagowa
+-- Author Name: azeh agowa
+-- mount on local database
+-- Organization domain: Elparadisogonzalo.com
+-- create: Os  OsELP
+-- CO-author: genyoungclip@gmail.com
+-- Admin-email: koa@elparadisogonzalo.com
+-- Admin-email: azehagowa@elparadisogonzalo.com
+-- Owner-email: azehagowa@gmail.com 
+CREATE DATABASE FullStackModel;
 
-Git - fast, scalable, distributed revision control system
-=========================================================
+-- Switch to the local database
+USE FullStackModel;
 
-Git is a fast, scalable, distributed revision control system with an
-unusually rich command set that provides both high-level operations
-and full access to internals.
+-- Create a Owner table
+CREATE TABLE Users (
+    UserID INT IDENTITY(1,1) PRIMARY KEY,
+    Username NVARCHAR(50) NOT NULL UNIQUE,
+    PasswordHash NVARCHAR(255) NOT NULL,
+    Email NVARCHAR(100) NOT NULL UNIQUE,
+    CreatedAt DATETIME DEFAULT GETDATE()
+);
 
-Git is an Open Source project covered by the GNU General Public
-License version 2 (some parts of it are under different licenses,
-compatible with the GPLv2). It was originally written by Linus
-Torvalds with help of a group of hackers around the net.
+-- Create a Roles table
+CREATE TABLE Roles (
+    RoleID INT IDENTITY(1,1) PRIMARY KEY,
+    RoleName NVARCHAR(50) NOT NULL UNIQUE,
+    CreatedAt DATETIME DEFAULT GETDATE()
+);
 
-Please read the file [INSTALL][] for installation instructions.
+-- Create a UserRoles table (many-to-many relationship between Users and Roles)
+CREATE TABLE UserRoles (
+    UserRoleID INT IDENTITY(1,1) PRIMARY KEY,
+    UserID INT NOT NULL,
+    RoleID INT NOT NULL,
+    AssignedAt DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (UserID) REFERENCES Users(UserID),
+    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)
+);
 
-Many Git online resources are accessible from <https://git-scm.com/>
-including full documentation and Git related tools.
+-- Create a Permissions table
+CREATE TABLE Permissions (
+    PermissionID INT IDENTITY(1,1) PRIMARY KEY,
+    PermissionName NVARCHAR(100) NOT NULL UNIQUE,
+    CreatedAt DATETIME DEFAULT GETDATE()
+);
 
-See [Documentation/gittutorial.adoc][] to get started, then see
-[Documentation/giteveryday.adoc][] for a useful minimum set of commands, and
-`Documentation/git-<commandname>.adoc` for documentation of each command.
-If git has been correctly installed, then the tutorial can also be
-read with `man gittutorial` or `git help tutorial`, and the
-documentation of each command with `man git-<commandname>` or `git help
-<commandname>`.
+-- Create a RolePermissions table (many-to-many relationship between Roles and Permissions)
+CREATE TABLE RolePermissions (
+    RolePermissionID INT IDENTITY(1,1) PRIMARY KEY,
+    RoleID INT NOT NULL,
+    PermissionID INT NOT NULL,
+    AssignedAt DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID),
+    FOREIGN KEY (PermissionID) REFERENCES Permissions(PermissionID)
+);
 
-CVS users may also want to read [Documentation/gitcvs-migration.adoc][]
-(`man gitcvs-migration` or `git help cvs-migration` if git is
-installed).
+-- Insert sample data into Roles
+INSERT INTO Roles (RoleName) VALUES ('Admin'), ('User'), ('Guest'), ('BillingAdmin');
 
-The user discussion and development of Git take place on the Git
-mailing list -- everyone is welcome to post bug reports, feature
-requests, comments and patches to git@vger.kernel.org (read
-[Documentation/SubmittingPatches][] for instructions on patch submission
-and [Documentation/CodingGuidelines][]).
+-- Insert sample data into Permissions
+INSERT INTO Permissions (PermissionName) VALUES ('Read'), ('Write'), ('Delete');
 
-Those wishing to help with error message, usage and informational message
-string translations (localization l10) should see [po/README.md][]
-(a `po` file is a Portable Object file that holds the translations).
+-- Grant all permissions to user elpmodel
+-- Ensure the login exists at the server level
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'elpmodel')
+BEGIN
+    CREATE LOGIN [elpmodel] WITH PASSWORD = 'aes';
+END
 
-To subscribe to the list, send an email to <git+subscribe@vger.kernel.org>
-(see https://subspace.kernel.org/subscribing.html for details). The mailing
-list archives are available at <https://lore.kernel.org/git/>,
-<https://marc.info/?l=git> and other archival sites.
+-- Ensure the user exists in the database
+USE FullStackModel;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'elpmodel')
+BEGIN
+    CREATE USER [elpmodel] FOR LOGIN [elpmodel];
+END
 
-Issues which are security relevant should be disclosed privately to
-the Git Security mailing list <git-security@googlegroups.com>.
+GRANT CONTROL ON DATABASE::FullStackModel TO [elpmodel];
 
-The maintainer frequently sends the "What's cooking" reports that
-list the current status of various development topics to the mailing
-list.  The discussion following them give a good reference for
-project status, development direction and remaining tasks.
+-- Assign elpmodel as a BillingAdmin
+DECLARE @UserID INT;
+DECLARE @RoleID INT;
 
-The name "git" was given by Linus Torvalds when he wrote the very
-first version. He described the tool as "the stupid content tracker"
-and the name as (depending on your mood):
+-- Assuming elpmodel is already in the Users table
+SELECT @UserID = UserID FROM Users WHERE Username = 'elpmodel';
+SELECT @RoleID = RoleID FROM Roles WHERE RoleName = 'BillingAdmin';
 
- - random three-letter combination that is pronounceable, and not
-   actually used by any common UNIX command.  The fact that it is a
-   mispronunciation of "get" may or may not be relevant.
- - stupid. contemptible and despicable. simple. Take your pick from the
-   dictionary of slang.
- - "global information tracker": you're in a good mood, and it actually
-   works for you. Angels sing, and a light suddenly fills the room.
- - "goddamn idiotic truckload of sh*t": when it breaks
+IF @UserID IS NOT NULL AND @RoleID IS NOT NULL
+BEGIN
+    INSERT INTO UserRoles (UserID, RoleID) VALUES (@UserID, @RoleID);
+END
 
-[INSTALL]: INSTALL
-[Documentation/gittutorial.adoc]: Documentation/gittutorial.adoc
-[Documentation/giteveryday.adoc]: Documentation/giteveryday.adoc
-[Documentation/gitcvs-migration.adoc]: Documentation/gitcvs-migration.adoc
-[Documentation/SubmittingPatches]: Documentation/SubmittingPatches
-[Documentation/CodingGuidelines]: Documentation/CodingGuidelines
-[po/README.md]: po/README.md
+-- Deploy the model to local disk
+BACKUP DATABASE FullStackModel 
+-- To safely remove obsolete backup files, use a SQL Agent job or an external script with appropriate permissions.
+-- Example: Set up a scheduled task or maintenance plan outside of SQL Server to delete old backup files.
+WITH FORMAT, INIT, NAME = 'FullStackModel Backup';
+
+-- Fast backup and sync removing obsolete files
+-- Backup the database
+BACKUP DATABASE FullStackModel 
+TO DISK = 'C:\SQLBackups\FullStackModel_FastSync.bak' 
+WITH DIFFERENTIAL, INIT, NAME = 'FullStackModel Fast Sync Backup';
+
+-- Remove obsolete backup files
+DECLARE @BackupPath NVARCHAR(255) = 'C:\SQLBackups';
+DECLARE @FilePattern NVARCHAR(255) = 'FullStackModel_*.bak';
+
+EXEC xp_cmdshell('forfiles /P "' + @BackupPath + '" /M "' + @FilePattern + '" /D -7 /C "cmd /c del @path"');
+-- Publish the database to elparadisogonzalo.com.vhdx
+-- To publish the database, use sqlpackage or a secure deployment tool from your terminal or CI/CD pipeline:
+-- Example coO
+mmand (run full SQL Server Management Studio):
+-- sqlpackage /Action:Publish /SourceFile:"C:\SQLBackups\FullStackModel.bak" /TargetServerName:"elparadisogonzalo.com" /TargetDatabaseName:"FullStackModel"
+EXEC xp_cmdshell @PublishCommand;
+
+-- The elpmodel table stores metadata about application instances or modules related to the FullStackModel project.
+-- Each record represents a distinct app or component, identified by AppName.
+CREATE TABLE elpmodel (
+    AppID INT IDENTITY(1,1) PRIMARY KEY,
+    AppName NVARCHAR(100) NOT NULL UNIQUE,
+    CreatedAt DATETIME DEFAULT GETDATE()
+);
